@@ -66,7 +66,6 @@ def BuildForecast(h, ts, AlgName, AlgTitle, ParamsArray, step='D'):
 		frc_ts = pd.DataFrame(index = ts.index.append(frc_horizon), columns = ts.columns)
 		
 		for cntr in ts.columns:
-		#frc_ts['Month'] = ts['Month']
 			frc_ts[cntr] = eval(AlgName)(ts[cntr], h, p)
 		
 #         frc_ts.columns = frc_ts.columns+('%s %s' % (AlgTitle, p))
@@ -83,6 +82,7 @@ def plotTSForecast(ts, frc_ts, ts_num=0, alg_title=''):
 	return ax
 	
 def InitExponentialSmoothing(x, h, Params):
+
     T = len(x)
     alpha = Params['alpha']
     AdaptationPeriod=Params['AdaptationPeriod']
@@ -108,3 +108,45 @@ def InitExponentialSmoothing(x, h, Params):
             #else do not nothing
         FORECAST[t+h] = y
     return FORECAST	
+
+
+
+# Start with this code
+###################### Winters Exponential Smoothing #########################
+# x <array Tx1>- time series, 
+# h <scalar> - forecasting delay
+# Params <dict> - dictionary with 
+#    alpha <scalar in [0,1]> - smoothing parameter
+#    delts <scalar in [0,1]> - seasonality smoothing parameter
+
+def WintersExponentialSmoothing(x, h, Params):
+    T = len(x)
+    alpha = Params['alpha']
+    delta = Params['delta']
+    p = Params['seasonality_period']
+    
+    FORECAST = [np.NaN] * (T + h)
+    
+    l= np.NaN
+    s= [np.NaN] * (T + 2 * p)
+    
+    full_cycles_num = T / p
+    ashki = []
+    for j in range(full_cycles_num):
+        ashki.append(sum([x[p * (j - 1) + i] for i in range(p)]))
+    
+    for t in range(T):
+        if not math.isnan(x[t]):
+            this_ind = t % p 
+            if math.isnan(l):
+                l=  1./ (p ** 2.) * (x[p : 2 * p].sum() - x[:p].sum())
+ 
+            if math.isnan(s[this_ind]):
+                s[this_ind]= 1. / full_cycles_num * sum([x[p * (j - 1) + this_ind] / float(ashki[j]) for j in range(full_cycles_num)]) 
+             
+            l_old = l
+            l = alpha * (x[t] - s[t - p]) + (1 - alpha) * l
+            s[t] = delta * (x[t] - l_old) + (1. - delta) * s[t - p]
+            
+        FORECAST[t+h] = l + s[t - p + h % p]
+    return FORECAST
